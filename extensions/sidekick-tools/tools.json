@@ -1,0 +1,17 @@
+[
+  {
+    "$schema": "https://extensions.shopifycdn.com/shopifycloud/schemas/v1/tool.json",
+    "name": "get_review_summary",
+    "description": "Get a summary of product reviews for this store, including total count, average rating, and recent reviews.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "Optional product ID to filter reviews for a specific product"
+        }
+      },
+      "required": []
+    }
+  }
+]
