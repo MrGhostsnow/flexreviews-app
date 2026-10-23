@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { pauseShop } from "../models/shop.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, topic } = await authenticate.webhook(request);
@@ -12,6 +13,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (session) {
     await db.session.deleteMany({ where: { shop } });
   }
+
+  // Stop auto-sync. Reviews and settings are kept until shop/redact so a
+  // reinstall picks up where it left off.
+  await pauseShop(shop);
 
   return new Response();
 };
