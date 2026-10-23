@@ -17,11 +17,10 @@ export function minutesFrom(date: Date, minutes: number) {
 // Creates the shop record on first visit. A reinstalled shop that is still
 // connected to Judge.me gets its auto-sync turned back on.
 export async function ensureShop(shop: string) {
-  const record = await db.shop.upsert({
-    where: { shop },
-    create: { shop },
-    update: {},
-  });
+  // ON CONFLICT DO NOTHING: parallel loaders call this on the first visit,
+  // and Prisma's upsert fails with a unique violation under that race.
+  await db.shop.createMany({ data: [{ shop }], skipDuplicates: true });
+  const record = await db.shop.findUniqueOrThrow({ where: { shop } });
 
   if (record.judgeMeToken && !record.nextSyncAt) {
     return db.shop.update({
