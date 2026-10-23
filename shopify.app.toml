@@ -2,8 +2,8 @@
 
 client_id = "57086c819ef5dbe6c9fb7500ab45ee88"
 name = "FlexReviews"
-# Production URL of the old reviews-api service. Point this at the new
-# Railway service when Phase 1 is deployed.
+# Still the old reviews-api service. Switched to the new Railway service at
+# cutover (see docs/cutover.md).
 application_url = "https://reviews-api-production-10bf.up.railway.app"
 embedded = true
 
@@ -14,13 +14,30 @@ automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2026-10"
-# No subscriptions in Phase 1. Webhooks (including the mandatory compliance
-# topics) are added in Phase 2.
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  # Handled by: /app/routes/webhooks.app_subscriptions.update.tsx
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "/webhooks/app_subscriptions/update"
+
+  # Handled by: /app/routes/webhooks.compliance.tsx
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/compliance"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-# Template default. Final scopes are decided in Phase 2.
-scopes = "write_products"
+scopes = "write_app_proxy"
 use_legacy_install_flow = false
 
 [access.admin]
@@ -33,8 +50,9 @@ redirect_urls = [
   "https://reviews-api-production-10bf.up.railway.app/api/billing/confirm"
 ]
 
-# Kept on the old reviews-api service so the storefront block keeps working
-# until the Phase 2 cutover.
+# Kept on the old reviews-api service until cutover (see docs/cutover.md).
+# The storefront block calls {shop}/apps/reviews/api/reviews, which both the
+# old service and app/routes/api.reviews.tsx serve.
 [app_proxy]
 url = "https://reviews-api-production-10bf.up.railway.app"
 subpath = "reviews"
@@ -65,3 +83,6 @@ type = "metaobject_reference<$app:faq>"
 
   [product.metafields.app.faq.access]
   admin = "merchant_read_write"
+
+[sidekick]
+extensions_summary = "Read review data and ratings for store products"
