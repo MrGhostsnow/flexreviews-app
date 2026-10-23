@@ -32,3 +32,41 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model Shop {
+  shop         String    @id
+  plan         String    @default("free")
+  // Judge.me private API token, encrypted with ENCRYPTION_KEY (see app/lib/crypto.server.ts).
+  judgeMeToken String?
+  // Auto-sync cadence in minutes.
+  syncInterval Int       @default(60)
+  lastSyncedAt DateTime?
+  nextSyncAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  reviews      Review[]
+}
+
+model Review {
+  shop                 String
+  sourceProvider       String
+  sourceReviewId       BigInt
+  // Public id kept from the old API ("judge_me_<sourceReviewId>").
+  id                   String
+  productExternalId    BigInt?
+  rating               Int
+  title                String?
+  body                 String?
+  reviewerName         String?
+  photos               String[]  @default([])
+  hasPublishedPictures Boolean   @default(false)
+  hasPublishedVideos   Boolean   @default(false)
+  verifiedBuyerStatus  String?
+  createdAt            DateTime?
+  syncedAt             DateTime  @default(now()) @updatedAt
+  shopRecord           Shop      @relation(fields: [shop], references: [shop], onDelete: Cascade)
+
+  @@id([shop, sourceProvider, sourceReviewId])
+  @@index([shop, productExternalId])
+  @@index([shop, createdAt])
+}
