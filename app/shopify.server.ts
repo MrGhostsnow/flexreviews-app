@@ -2,6 +2,7 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  LogSeverity,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
@@ -16,6 +17,13 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  // Debug logs show why session tokens are rejected during development.
+  logger: {
+    level:
+      process.env.NODE_ENV === "production"
+        ? LogSeverity.Info
+        : LogSeverity.Debug,
+  },
   future: {
     expiringOfflineAccessTokens: true,
   },

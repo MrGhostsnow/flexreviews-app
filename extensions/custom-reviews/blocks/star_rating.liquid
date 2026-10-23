@@ -1,0 +1,1098 @@
+{% comment %}
+  Custom Reviews Block — v3
+  Fetches reviews from the app's own backend (Remix route /api/reviews)
+  and renders them using 100% custom HTML/CSS, with no external widget or
+  library involved.
+
+  Supports three layouts (grid, carousel, list) driven by theme editor
+  settings. Carousel and list are Pro-only: if the backend reports
+  upgradeRequired, an upgrade banner is shown and the grid layout is
+  rendered as a fallback instead.
+{% endcomment %}
+
+<div
+  id="custom-reviews-{{ block.id }}"
+  class="cr-container"
+  data-template="{{ block.settings.template }}"
+  data-count="{{ block.settings.reviews_count }}"
+  data-sort="{{ block.settings.sort_order }}"
+  data-star-color="{{ block.settings.star_color }}"
+  data-card-bg="{{ block.settings.card_background }}"
+  data-card-border="{{ block.settings.card_border_color }}"
+  data-text-color="{{ block.settings.text_color }}"
+  data-proxy-url="{{ shop.url }}/apps/reviews"
+  data-store-handle="{{ shop.permanent_domain | remove: '.myshopify.com' }}"
+  data-star-size="{{ block.settings.star_size }}"
+  data-star-empty-color="{{ block.settings.star_empty_color }}"
+  data-star-style="{{ block.settings.star_style }}"
+  data-card-border-radius="{{ block.settings.card_border_radius }}"
+  data-card-shadow="{{ block.settings.card_shadow }}"
+  data-reviewer-name-color="{{ block.settings.reviewer_name_color }}"
+  data-date-color="{{ block.settings.date_color }}"
+  data-body-font-size="{{ block.settings.body_font_size }}"
+  data-name-font-size="{{ block.settings.name_font_size }}"
+  data-section-title="{{ block.settings.section_title }}"
+  data-show-section-title="{{ block.settings.show_section_title }}"
+  data-show-average-rating="{{ block.settings.show_average_rating }}"
+  data-show-review-count="{{ block.settings.show_review_count }}"
+  data-show-reviewer-name="{{ block.settings.show_reviewer_name }}"
+  data-show-date="{{ block.settings.show_date }}"
+  data-date-format="{{ block.settings.date_format }}"
+  data-show-verified-badge="{{ block.settings.show_verified_badge }}"
+  data-show-review-title="{{ block.settings.show_review_title }}"
+  data-truncate-body="{{ block.settings.truncate_body }}"
+  data-columns="{{ block.settings.columns }}"
+  data-card-spacing="{{ block.settings.card_spacing }}"
+  data-product-id="{{ product.id | default: 0 }}"
+  data-show-photos="{{ block.settings.show_photos }}"
+  data-show-avatar="{{ block.settings.show_avatar }}"
+>
+  <div class="cr-banner" hidden></div>
+
+  <div class="cr-content">
+    <div class="cr-grid cr-skeleton" aria-hidden="true">
+      <div class="cr-card cr-card--skeleton"></div>
+      <div class="cr-card cr-card--skeleton"></div>
+      <div class="cr-card cr-card--skeleton"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cr-container {
+    padding: 24px 0;
+    font-family: inherit;
+    --cr-star-color: #1a1a1a;
+    --cr-card-bg: #ffffff;
+    --cr-card-border: #e5e5e5;
+    --cr-text-color: #1a1a1a;
+    --cr-star-size: 16px;
+    --cr-star-empty-color: #d1d5db;
+    --cr-card-border-radius: 12px;
+    --cr-reviewer-name-color: #111827;
+    --cr-date-color: #9ca3af;
+    --cr-body-font-size: 14px;
+    --cr-name-font-size: 13px;
+  }
+
+  .cr-heading {
+    font-size: 18px;
+    margin: 0 0 16px;
+    color: var(--cr-text-color);
+  }
+
+  .cr-banner {
+    background: #fff7e6;
+    border: 1px solid #f0c36d;
+    color: #7a5c00;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  .cr-banner[hidden] {
+    display: none;
+  }
+
+  /* Grid layout */
+  .cr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  /* Carousel layout */
+  .cr-carousel-wrap {
+    position: relative;
+  }
+  .cr-carousel-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cr-carousel-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--cr-card-border);
+    background: var(--cr-card-bg);
+    color: var(--cr-text-color);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .cr-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 16px;
+    padding-bottom: 4px;
+  }
+  .cr-card--carousel {
+    flex: 0 0 280px;
+    scroll-snap-align: start;
+  }
+
+  /* List layout */
+  .cr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cr-list-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    border: 1px solid var(--cr-card-border);
+    background: var(--cr-card-bg);
+    border-radius: var(--cr-card-border-radius);
+    padding: 16px;
+  }
+  .cr-list-row__stars {
+    flex: 0 0 auto;
+  }
+  .cr-list-row__content {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .cr-list-row__body {
+    margin: 0 0 8px;
+    line-height: 1.5;
+    color: var(--cr-text-color);
+    white-space: normal;
+  }
+  .cr-list-row__author {
+    font-size: 13px;
+    color: var(--cr-text-color);
+    opacity: 0.6;
+    margin: 0;
+  }
+
+  /* Card */
+  .cr-card {
+    border: 1px solid var(--cr-card-border);
+    background: var(--cr-card-bg);
+    color: var(--cr-text-color);
+    border-radius: var(--cr-card-border-radius);
+    padding: 16px;
+  }
+  .cr-card--skeleton {
+    min-height: 100px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: cr-shimmer 1.4s infinite;
+    border: none;
+  }
+  @keyframes cr-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .cr-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .cr-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .cr-stars {
+    display: inline-block;
+    font-size: var(--cr-star-size);
+  }
+  .cr-star {
+    color: var(--cr-star-color);
+  }
+  .cr-star--empty {
+    opacity: 0.2;
+  }
+
+  .cr-title {
+    margin: 0 0 8px;
+  }
+
+  .cr-body {
+    margin: 0 0 8px;
+    line-height: 1.5;
+  }
+  .cr-author {
+    font-size: 13px;
+    opacity: 0.6;
+    margin: 0;
+  }
+
+  .cr-empty {
+    color: var(--cr-text-color);
+    opacity: 0.6;
+    font-size: 14px;
+  }
+
+  /* Card shadow variants */
+  .cr-card[data-shadow="subtle"] { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .cr-card[data-shadow="medium"] { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+
+  /* Card spacing variants */
+  .cr-grid[data-spacing="compact"] .cr-card { padding: 10px; }
+  .cr-grid[data-spacing="normal"] .cr-card { padding: 16px; }
+  .cr-grid[data-spacing="spacious"] .cr-card { padding: 24px; }
+
+  /* Star styles */
+  .cr-star--filled { color: var(--cr-star-color); font-size: var(--cr-star-size); }
+  .cr-star--empty { color: var(--cr-star-empty-color); font-size: var(--cr-star-size); }
+
+  /* Typography */
+  .cr-body { font-size: var(--cr-body-font-size); color: var(--cr-text-color); }
+  .cr-reviewer { font-size: var(--cr-name-font-size); color: var(--cr-reviewer-name-color); }
+  .cr-date { font-size: var(--cr-name-font-size); color: var(--cr-date-color); }
+  .cr-verified { font-size: 11px; color: #059669; }
+  .cr-read-more { background: none; border: none; color: var(--cr-text-accent, #2c6ecb); cursor: pointer; font-size: var(--cr-body-font-size); padding: 0; text-decoration: underline; }
+
+  /* Header */
+  .cr-header { margin-bottom: 16px; }
+  .cr-heading { margin: 0 0 4px; font-size: 18px; }
+  .cr-summary { margin: 0 0 12px; font-size: 14px; color: var(--cr-date-color); }
+  .cr-avg { color: var(--cr-star-color); font-weight: 600; }
+
+  /* Photos */
+  .cr-photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 6px;
+  }
+  .cr-photo-link {
+    display: block;
+    width: 72px;
+    height: 72px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .cr-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Avatar */
+  .cr-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Upgrade hint */
+  .cr-upgrade-hint {
+    font-size: 12px;
+    color: #6B7280;
+    text-align: center;
+    margin-top: 12px;
+    padding: 8px;
+    border: 1px dashed #D1D5DB;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 480px) {
+    .cr-grid {
+      grid-template-columns: 1fr;
+    }
+    .cr-list-row {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    var container = document.getElementById("custom-reviews-{{ block.id }}");
+    if (!container) return;
+
+    var banner = container.querySelector(".cr-banner");
+    var content = container.querySelector(".cr-content");
+
+    var settings = {
+      template: container.dataset.template,
+      count: container.dataset.count,
+      sort: container.dataset.sort,
+      starColor: container.dataset.starColor,
+      cardBg: container.dataset.cardBg,
+      cardBorder: container.dataset.cardBorder,
+      textColor: container.dataset.textColor,
+      proxyUrl: container.dataset.proxyUrl,
+      productId: container.dataset.productId || "0",
+      starSize: container.dataset.starSize,
+      starEmptyColor: container.dataset.starEmptyColor,
+      starStyle: container.dataset.starStyle,
+      cardBorderRadius: container.dataset.cardBorderRadius,
+      cardShadow: container.dataset.cardShadow,
+      reviewerNameColor: container.dataset.reviewerNameColor,
+      dateColor: container.dataset.dateColor,
+      bodyFontSize: container.dataset.bodyFontSize,
+      nameFontSize: container.dataset.nameFontSize,
+      sectionTitle: container.dataset.sectionTitle,
+      showSectionTitle: container.dataset.showSectionTitle === "true",
+      showAverageRating: container.dataset.showAverageRating === "true",
+      showReviewCount: container.dataset.showReviewCount === "true",
+      showReviewerName: container.dataset.showReviewerName === "true",
+      showDate: container.dataset.showDate === "true",
+      dateFormat: container.dataset.dateFormat,
+      showVerifiedBadge: container.dataset.showVerifiedBadge === "true",
+      showReviewTitle: container.dataset.showReviewTitle === "true",
+      truncateBody: container.dataset.truncateBody === "true",
+      columns: container.dataset.columns,
+      cardSpacing: container.dataset.cardSpacing,
+      showPhotos: container.dataset.showPhotos === "true",
+      showAvatar: container.dataset.showAvatar === "true"
+    };
+
+    // Base colors (free)
+    container.style.setProperty("--cr-star-color", settings.starColor);
+    container.style.setProperty("--cr-card-bg", settings.cardBg);
+    container.style.setProperty("--cr-card-border", settings.cardBorder);
+    container.style.setProperty("--cr-text-color", settings.textColor);
+
+    // Star settings (free)
+    container.style.setProperty("--cr-star-size", settings.starSize + "px");
+    container.style.setProperty("--cr-star-empty-color", settings.starEmptyColor);
+
+    // Pro-gated CSS vars (card border radius, reviewer name/date color, font
+    // sizes) are applied later, once the API response tells us the plan.
+
+    function buildStars(rating, style) {
+      style = style || "classic";
+      var filled = style === "dot" ? "●" : "★";
+      var empty = style === "dot" ? "○" : style === "outline" ? "☆" : "★";
+
+      var wrap = document.createElement("span");
+      wrap.className = "cr-stars";
+      wrap.setAttribute("aria-label", rating + " out of 5 stars");
+
+      for (var i = 0; i < 5; i++) {
+        var isFilled = i < rating;
+        var star = document.createElement("span");
+        star.className = "cr-star " + (isFilled ? "cr-star--filled" : "cr-star--empty");
+        star.setAttribute("aria-hidden", "true");
+        star.textContent = isFilled ? filled : empty;
+        wrap.appendChild(star);
+      }
+
+      return wrap;
+    }
+
+    function buildDate(dateStr, format) {
+      format = format || "relative";
+      if (!dateStr) return "";
+      var date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "";
+
+      if (format === "absolute") {
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      var diffMs = Date.now() - date.getTime();
+      var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays < 30) return diffDays + " days ago";
+      var diffMonths = Math.floor(diffDays / 30);
+      if (diffMonths < 12) return diffMonths + " month" + (diffMonths > 1 ? "s" : "") + " ago";
+      var diffYears = Math.floor(diffMonths / 12);
+      return diffYears + " year" + (diffYears > 1 ? "s" : "") + " ago";
+    }
+
+    function buildTruncatedBody(text, maxLength) {
+      maxLength = maxLength || 150;
+      var body = document.createElement("p");
+      body.className = "cr-body";
+
+      if (text.length <= maxLength) {
+        body.textContent = text;
+        return body;
+      }
+
+      body.classList.add("cr-body--truncated");
+
+      var textSpan = document.createElement("span");
+      textSpan.className = "cr-body-text";
+      textSpan.textContent = text.slice(0, maxLength) + "...";
+
+      var fullSpan = document.createElement("span");
+      fullSpan.className = "cr-body-full";
+      fullSpan.style.display = "none";
+      fullSpan.textContent = text;
+
+      var readMoreBtn = document.createElement("button");
+      readMoreBtn.type = "button";
+      readMoreBtn.className = "cr-read-more";
+      readMoreBtn.textContent = "Read more";
+      readMoreBtn.addEventListener("click", function () {
+        fullSpan.style.display = "inline";
+        textSpan.style.display = "none";
+        readMoreBtn.style.display = "none";
+      });
+
+      body.appendChild(textSpan);
+      body.appendChild(fullSpan);
+      body.appendChild(readMoreBtn);
+      return body;
+    }
+
+    function buildPhotos(photos, showPhotos) {
+      if (!showPhotos || !photos || !photos.length) return null;
+
+      var wrap = document.createElement("div");
+      wrap.className = "cr-photos";
+
+      photos.slice(0, 4).forEach(function (url) {
+        var link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.className = "cr-photo-link";
+
+        var img = document.createElement("img");
+        img.src = url;
+        img.alt = "Review photo";
+        img.className = "cr-photo";
+        img.loading = "lazy";
+        img.addEventListener("error", function () {
+          link.style.display = "none";
+        });
+
+        link.appendChild(img);
+        wrap.appendChild(link);
+      });
+
+      return wrap;
+    }
+
+    function buildAvatar(reviewerName, showAvatar) {
+      if (!showAvatar) return null;
+
+      var name = reviewerName || "A";
+      var initials = name
+        .split(" ")
+        .map(function (w) { return w[0]; })
+        .slice(0, 2)
+        .join("")
+        .toUpperCase();
+
+      var colors = ["#6366F1", "#8B5CF6", "#EC4899", "#14B8A6", "#F59E0B", "#10B981", "#3B82F6"];
+      var colorIndex = name.charCodeAt(0) % colors.length;
+
+      var avatar = document.createElement("span");
+      avatar.className = "cr-avatar";
+      avatar.style.background = colors[colorIndex];
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = initials;
+      return avatar;
+    }
+
+    function getEffectiveSettings(baseSettings, isPro) {
+      var effective = {};
+      for (var key in baseSettings) {
+        if (Object.prototype.hasOwnProperty.call(baseSettings, key)) {
+          effective[key] = baseSettings[key];
+        }
+      }
+
+      effective.cardBorderRadius = isPro ? baseSettings.cardBorderRadius : "8";
+      effective.cardShadow = isPro ? baseSettings.cardShadow : "none";
+      effective.cardSpacing = isPro ? baseSettings.cardSpacing : "normal";
+      effective.reviewerNameColor = isPro ? baseSettings.reviewerNameColor : baseSettings.textColor;
+      effective.dateColor = isPro ? baseSettings.dateColor : "#9CA3AF";
+      effective.bodyFontSize = isPro ? baseSettings.bodyFontSize : "14";
+      effective.nameFontSize = isPro ? baseSettings.nameFontSize : "13";
+      effective.dateFormat = isPro ? baseSettings.dateFormat : "relative";
+      effective.showAverageRating = isPro ? baseSettings.showAverageRating : false;
+      effective.showReviewCount = isPro ? baseSettings.showReviewCount : false;
+      effective.showVerifiedBadge = isPro ? baseSettings.showVerifiedBadge : false;
+      effective.truncateBody = isPro ? baseSettings.truncateBody : false;
+
+      return effective;
+    }
+
+    function hasProSettingsConfigured(baseSettings) {
+      return baseSettings.cardShadow !== "none"
+        || baseSettings.cardSpacing !== "normal"
+        || baseSettings.dateFormat === "absolute"
+        || baseSettings.showAverageRating === true
+        || baseSettings.truncateBody === true;
+    }
+
+    function showUpgradeHint() {
+      // Shopify App Pricing plan selection page. Uses the permanent
+      // .myshopify.com handle — shop.url can be a custom storefront domain.
+      var upgradeUrl = "https://admin.shopify.com/store/" + container.dataset.storeHandle
+        + "/charges/flexreviews/pricing_plans";
+
+      var hint = document.createElement("p");
+      hint.className = "cr-upgrade-hint";
+      hint.innerHTML = "✨ <a href=\"" + upgradeUrl + "\" target=\"_blank\" rel=\"noopener\" style=\"color:inherit\">Upgrade to Pro</a> to unlock advanced styling options.";
+
+      container.appendChild(hint);
+    }
+
+    function buildCard(review, cardSettings) {
+      var card = document.createElement("div");
+      card.className = "cr-card";
+      if (cardSettings.cardShadow) {
+        card.setAttribute("data-shadow", cardSettings.cardShadow);
+      }
+
+      var header = document.createElement("div");
+      header.className = "cr-card-header";
+      header.appendChild(buildStars(review.rating, cardSettings.starStyle));
+
+      if (cardSettings.showDate) {
+        var dateEl = document.createElement("span");
+        dateEl.className = "cr-date";
+        dateEl.textContent = buildDate(review.createdAt, cardSettings.dateFormat);
+        header.appendChild(dateEl);
+      }
+
+      card.appendChild(header);
+
+      if (cardSettings.showReviewTitle && review.title) {
+        var title = document.createElement("p");
+        title.className = "cr-title";
+        var strong = document.createElement("strong");
+        strong.textContent = review.title;
+        title.appendChild(strong);
+        card.appendChild(title);
+      }
+
+      var body = cardSettings.truncateBody
+        ? buildTruncatedBody(review.body || "")
+        : (function () {
+            var p = document.createElement("p");
+            p.className = "cr-body";
+            p.textContent = review.body || "";
+            return p;
+          })();
+      card.appendChild(body);
+
+      var photos = buildPhotos(review.photos, cardSettings.showPhotos);
+      if (photos) {
+        card.appendChild(photos);
+      }
+
+      var footer = document.createElement("div");
+      footer.className = "cr-card-footer";
+
+      var avatar = buildAvatar(review.reviewerName, cardSettings.showAvatar);
+      if (avatar) {
+        footer.appendChild(avatar);
+      }
+
+      if (cardSettings.showReviewerName) {
+        var author = document.createElement("span");
+        author.className = "cr-reviewer";
+        author.textContent = review.reviewerName || "Anonymous";
+        footer.appendChild(author);
+      }
+
+      if (cardSettings.showVerifiedBadge && review.verifiedBuyerStatus === "verified") {
+        var verified = document.createElement("span");
+        verified.className = "cr-verified";
+        verified.textContent = "✓ Verified";
+        footer.appendChild(verified);
+      }
+
+      card.appendChild(footer);
+
+      return card;
+    }
+
+    function renderGrid(target, reviews, gridSettings) {
+      var grid = document.createElement("div");
+      grid.className = "cr-grid";
+      grid.setAttribute("data-spacing", gridSettings.cardSpacing || "normal");
+
+      var cols = gridSettings.columns;
+      grid.style.gridTemplateColumns = cols && cols !== "auto"
+        ? "repeat(" + cols + ", 1fr)"
+        : "repeat(auto-fill, minmax(240px, 1fr))";
+
+      reviews.forEach(function (review) {
+        grid.appendChild(buildCard(review, gridSettings));
+      });
+      target.appendChild(grid);
+    }
+
+    function renderCarousel(target, reviews, cardSettings) {
+      var wrap = document.createElement("div");
+      wrap.className = "cr-carousel-wrap";
+
+      var controls = document.createElement("div");
+      controls.className = "cr-carousel-controls";
+
+      var prevBtn = document.createElement("button");
+      prevBtn.type = "button";
+      prevBtn.className = "cr-carousel-btn cr-carousel-btn--prev";
+      prevBtn.setAttribute("aria-label", "Previous reviews");
+      prevBtn.textContent = "‹";
+
+      var nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.className = "cr-carousel-btn cr-carousel-btn--next";
+      nextBtn.setAttribute("aria-label", "Next reviews");
+      nextBtn.textContent = "›";
+
+      controls.appendChild(prevBtn);
+      controls.appendChild(nextBtn);
+
+      var track = document.createElement("div");
+      track.className = "cr-carousel";
+
+      reviews.forEach(function (review) {
+        var card = buildCard(review, cardSettings);
+        card.classList.add("cr-card--carousel");
+        track.appendChild(card);
+      });
+
+      prevBtn.addEventListener("click", function () {
+        track.scrollBy({ left: -300, behavior: "smooth" });
+      });
+      nextBtn.addEventListener("click", function () {
+        track.scrollBy({ left: 300, behavior: "smooth" });
+      });
+
+      wrap.appendChild(controls);
+      wrap.appendChild(track);
+      target.appendChild(wrap);
+    }
+
+    function renderList(target, reviews, cardSettings) {
+      var list = document.createElement("div");
+      list.className = "cr-list";
+
+      reviews.forEach(function (review) {
+        var row = document.createElement("div");
+        row.className = "cr-list-row";
+
+        var starsCol = document.createElement("div");
+        starsCol.className = "cr-list-row__stars";
+        starsCol.appendChild(buildStars(review.rating, cardSettings.starStyle));
+
+        var contentCol = document.createElement("div");
+        contentCol.className = "cr-list-row__content";
+
+        var body = document.createElement("p");
+        body.className = "cr-list-row__body";
+        body.textContent = review.body || "";
+
+        var author = document.createElement("p");
+        author.className = "cr-list-row__author";
+        author.textContent = review.reviewerName || "Anonymous";
+
+        contentCol.appendChild(body);
+        contentCol.appendChild(author);
+
+        row.appendChild(starsCol);
+        row.appendChild(contentCol);
+        list.appendChild(row);
+      });
+
+      target.appendChild(list);
+    }
+
+    function renderHeader(target, reviews, headerSettings) {
+      var showSectionTitle = headerSettings.showSectionTitle;
+      var showAverageRating = headerSettings.showAverageRating;
+      var showReviewCount = headerSettings.showReviewCount;
+
+      if (!showSectionTitle && !showAverageRating && !showReviewCount) return;
+
+      var header = document.createElement("div");
+      header.className = "cr-header";
+
+      if (showSectionTitle) {
+        var heading = document.createElement("h3");
+        heading.className = "cr-heading";
+        heading.textContent = headerSettings.sectionTitle || "Customer Reviews";
+        header.appendChild(heading);
+      }
+
+      if (showAverageRating || showReviewCount) {
+        var avg = reviews.length
+          ? (reviews.reduce(function (sum, r) { return sum + r.rating; }, 0) / reviews.length).toFixed(1)
+          : "0.0";
+
+        var summary = document.createElement("p");
+        summary.className = "cr-summary";
+
+        if (showAverageRating) {
+          var avgSpan = document.createElement("span");
+          avgSpan.className = "cr-avg";
+          avgSpan.textContent = "★ " + avg;
+          summary.appendChild(avgSpan);
+        }
+        if (showAverageRating && showReviewCount) {
+          summary.appendChild(document.createTextNode(" · "));
+        }
+        if (showReviewCount) {
+          var countSpan = document.createElement("span");
+          countSpan.className = "cr-count";
+          countSpan.textContent = reviews.length + " review" + (reviews.length !== 1 ? "s" : "");
+          summary.appendChild(countSpan);
+        }
+
+        header.appendChild(summary);
+      }
+
+      target.appendChild(header);
+    }
+
+    function showMessage(message) {
+      content.innerHTML = "";
+      var p = document.createElement("p");
+      p.className = "cr-empty";
+      p.textContent = message;
+      content.appendChild(p);
+    }
+
+    function showBanner(template) {
+      banner.hidden = false;
+      banner.textContent = "✨ Upgrade to Pro to unlock the " + template + " layout.";
+    }
+
+    function renderTemplate(template, reviews, effectiveSettings) {
+      content.innerHTML = "";
+
+      renderHeader(content, reviews, effectiveSettings);
+
+      if (!reviews.length) {
+        showMessage("No reviews yet.");
+        return;
+      }
+
+      if (template === "carousel") {
+        renderCarousel(content, reviews, effectiveSettings);
+      } else if (template === "list") {
+        renderList(content, reviews, effectiveSettings);
+      } else {
+        renderGrid(content, reviews, effectiveSettings);
+      }
+    }
+
+    var query = new URLSearchParams({
+      template: settings.template,
+      count: settings.count,
+      sort: settings.sort,
+      productId: settings.productId
+    });
+
+    fetch(settings.proxyUrl + "/api/reviews?" + query.toString())
+      .then(function (res) {
+        return res.json();
+      })
+      .then(function (data) {
+        var reviews = data.reviews || [];
+        var isPro = data.plan === "pro";
+        var effectiveSettings = getEffectiveSettings(settings, isPro);
+
+        container.style.setProperty("--cr-card-border-radius", effectiveSettings.cardBorderRadius + "px");
+        container.style.setProperty("--cr-reviewer-name-color", effectiveSettings.reviewerNameColor);
+        container.style.setProperty("--cr-date-color", effectiveSettings.dateColor);
+        container.style.setProperty("--cr-body-font-size", effectiveSettings.bodyFontSize + "px");
+        container.style.setProperty("--cr-name-font-size", effectiveSettings.nameFontSize + "px");
+
+        if (data.upgradeRequired === true) {
+          showBanner(settings.template);
+          renderTemplate("grid", reviews, effectiveSettings);
+        } else {
+          banner.hidden = true;
+          renderTemplate(data.template || settings.template, reviews, effectiveSettings);
+        }
+
+        if (!isPro && hasProSettingsConfigured(settings) && window.Shopify?.designMode) {
+          showUpgradeHint();
+        }
+      })
+      .catch(function () {
+        showMessage("Could not load reviews right now.");
+      });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Custom Reviews",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "template",
+      "label": "Display style",
+      "options": [
+        { "value": "grid", "label": "Grid" },
+        { "value": "carousel", "label": "Carousel (Pro)" },
+        { "value": "list", "label": "List (Pro)" }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "columns",
+      "label": "Grid columns",
+      "info": "Only applies to Grid layout",
+      "options": [
+        { "value": "auto", "label": "Auto (responsive)" },
+        { "value": "2", "label": "2 columns" },
+        { "value": "3", "label": "3 columns" },
+        { "value": "4", "label": "4 columns" }
+      ],
+      "default": "auto"
+    },
+    {
+      "type": "range",
+      "id": "reviews_count",
+      "label": "Number of reviews",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "type": "select",
+      "id": "sort_order",
+      "label": "Sort by",
+      "options": [
+        { "value": "recent", "label": "Most recent" },
+        { "value": "highest", "label": "Highest rated" },
+        { "value": "lowest", "label": "Lowest rated" }
+      ],
+      "default": "recent"
+    },
+    {
+      "type": "select",
+      "id": "card_spacing",
+      "label": "Card spacing (Pro)",
+      "options": [
+        { "value": "compact", "label": "Compact" },
+        { "value": "normal", "label": "Normal" },
+        { "value": "spacious", "label": "Spacious" }
+      ],
+      "default": "normal"
+    },
+    {
+      "type": "header",
+      "content": "Section header"
+    },
+    {
+      "type": "text",
+      "id": "section_title",
+      "label": "Section title",
+      "default": "Customer Reviews"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_section_title",
+      "label": "Show section title",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_average_rating",
+      "label": "Show average rating summary (Pro)",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_count",
+      "label": "Show total review count (Pro)",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Review cards"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_reviewer_name",
+      "label": "Show reviewer name",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_date",
+      "label": "Show review date",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "date_format",
+      "label": "Date format (Pro)",
+      "options": [
+        { "value": "relative", "label": "Relative (3 days ago)" },
+        { "value": "absolute", "label": "Absolute (Aug 15, 2026)" }
+      ],
+      "default": "relative"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_verified_badge",
+      "label": "Show verified purchase badge (Pro)",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_title",
+      "label": "Show review title",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "truncate_body",
+      "label": "Truncate long reviews (Pro)",
+      "info": "Shows a 'Read more' link for long reviews",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_photos",
+      "label": "Show review photos",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_avatar",
+      "label": "Show reviewer avatar",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Stars"
+    },
+    {
+      "type": "select",
+      "id": "star_style",
+      "label": "Star style",
+      "options": [
+        { "value": "classic", "label": "Classic (★)" },
+        { "value": "outline", "label": "Outline (☆ filled)" },
+        { "value": "dot", "label": "Dots (●)" }
+      ],
+      "default": "classic"
+    },
+    {
+      "type": "range",
+      "id": "star_size",
+      "label": "Star size",
+      "min": 12,
+      "max": 28,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "color",
+      "id": "star_color",
+      "label": "Star color (filled)",
+      "default": "#E6A817"
+    },
+    {
+      "type": "color",
+      "id": "star_empty_color",
+      "label": "Star color (empty)",
+      "default": "#D1D5DB"
+    },
+    {
+      "type": "header",
+      "content": "Colors & typography"
+    },
+    {
+      "type": "color",
+      "id": "card_background",
+      "label": "Card background",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "card_border_color",
+      "label": "Card border color",
+      "default": "#E5E7EB"
+    },
+    {
+      "type": "range",
+      "id": "card_border_radius",
+      "label": "Card border radius (Pro)",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "select",
+      "id": "card_shadow",
+      "label": "Card shadow (Pro)",
+      "options": [
+        { "value": "none", "label": "None" },
+        { "value": "subtle", "label": "Subtle" },
+        { "value": "medium", "label": "Medium" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Review text color",
+      "default": "#374151"
+    },
+    {
+      "type": "color",
+      "id": "reviewer_name_color",
+      "label": "Reviewer name color (Pro)",
+      "default": "#111827"
+    },
+    {
+      "type": "color",
+      "id": "date_color",
+      "label": "Date color (Pro)",
+      "default": "#9CA3AF"
+    },
+    {
+      "type": "range",
+      "id": "body_font_size",
+      "label": "Review text size (Pro)",
+      "min": 12,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "name_font_size",
+      "label": "Reviewer name size (Pro)",
+      "min": 11,
+      "max": 16,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    }
+  ]
+}
+{% endschema %}
