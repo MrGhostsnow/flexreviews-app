@@ -65,7 +65,7 @@ The new version:
 
 - removes the `app-home` extension (replaced by the embedded pages),
 - keeps `custom-reviews` and `sidekick-tools` with their existing uids,
-- reduces scopes to `write_app_proxy`,
+- keeps scopes at `write_app_proxy,write_products`,
 - subscribes the webhooks to the new service.
 
 The CLI asks to confirm removing `app-home`; confirm.

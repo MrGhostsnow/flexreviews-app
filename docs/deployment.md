@@ -34,7 +34,7 @@ string from the app service.
 | `SHOPIFY_API_KEY`    | App client ID                                                |
 | `SHOPIFY_API_SECRET` | App client secret                                            |
 | `SHOPIFY_APP_URL`    | `https://` + the generated Railway domain                    |
-| `SCOPES`             | Same value as `access_scopes.scopes` in `shopify.app.toml` (`write_app_proxy`) |
+| `SCOPES`             | Same value as `access_scopes.scopes` in `shopify.app.toml` (`write_app_proxy,write_products`) |
 | `ENCRYPTION_KEY`     | 32 random bytes, base64-encoded. Encrypts the Judge.me tokens. |
 
 Optional: `SHOP_CUSTOM_DOMAIN`.
