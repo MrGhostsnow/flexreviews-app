@@ -2,9 +2,7 @@
 
 client_id = "57086c819ef5dbe6c9fb7500ab45ee88"
 name = "FlexReviews"
-# Still the old reviews-api service. Switched to the new Railway service at
-# cutover (see docs/cutover.md).
-application_url = "https://reviews-api-production-10bf.up.railway.app"
+application_url = "https://flexreviews-app-production.up.railway.app"
 embedded = true
 
 [build]
@@ -47,15 +45,15 @@ embedded_app_direct_api_access = true
 
 [auth]
 redirect_urls = [
-  "https://reviews-api-production-10bf.up.railway.app/api/auth/callback",
-  "https://reviews-api-production-10bf.up.railway.app/api/billing/confirm"
+  "https://flexreviews-app-production.up.railway.app/auth/callback",
+  "https://flexreviews-app-production.up.railway.app/auth/shopify/callback",
+  "https://flexreviews-app-production.up.railway.app/api/auth/callback"
 ]
 
-# Kept on the old reviews-api service until cutover (see docs/cutover.md).
-# The storefront block calls {shop}/apps/reviews/api/reviews, which both the
-# old service and app/routes/api.reviews.tsx serve.
+# The storefront block calls {shop}/apps/reviews/api/reviews, served by
+# app/routes/api.reviews.tsx.
 [app_proxy]
-url = "https://reviews-api-production-10bf.up.railway.app"
+url = "https://flexreviews-app-production.up.railway.app"
 subpath = "reviews"
 prefix = "apps"
 
