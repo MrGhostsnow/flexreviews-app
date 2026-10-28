@@ -10,10 +10,17 @@ export function parseSort(value: string | null | undefined): SortKey {
     : "recent";
 }
 
+// The review id breaks ties so the order is stable across pages and screens
+// (Judge.me imports often share the same createdAt).
+const NEWEST_FIRST: Prisma.ReviewOrderByWithRelationInput[] = [
+  { createdAt: { sort: "desc", nulls: "last" } },
+  { sourceReviewId: "desc" },
+];
+
 const ORDER_BY: Record<SortKey, Prisma.ReviewOrderByWithRelationInput[]> = {
-  recent: [{ createdAt: { sort: "desc", nulls: "last" } }],
-  highest: [{ rating: "desc" }, { createdAt: { sort: "desc", nulls: "last" } }],
-  lowest: [{ rating: "asc" }, { createdAt: { sort: "desc", nulls: "last" } }],
+  recent: NEWEST_FIRST,
+  highest: [{ rating: "desc" }, ...NEWEST_FIRST],
+  lowest: [{ rating: "asc" }, ...NEWEST_FIRST],
 };
 
 // Parses a positive integer id; Shopify product ids don't fit in 32 bits.
