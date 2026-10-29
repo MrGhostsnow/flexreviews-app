@@ -37,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? Math.min(requestedCount, MAX_COUNT)
       : DEFAULT_COUNT;
 
-  const { reviews } = await listReviews(shop, {
+  const { reviews } = await listReviews(shop, plan, {
     productId: parseId(url.searchParams.get("productId")),
     sort,
     limit: count,

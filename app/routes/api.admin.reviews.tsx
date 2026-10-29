@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { getShop } from "../models/shop.server";
 import { listReviews, parseId, parseSort } from "../models/review.server";
 
 const DEFAULT_LIMIT = 20;
@@ -18,7 +19,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       : DEFAULT_LIMIT;
   const rating = parseInt(url.searchParams.get("rating") ?? "", 10);
 
-  const { reviews, total } = await listReviews(session.shop, {
+  const shop = await getShop(session.shop);
+  const { reviews, total } = await listReviews(session.shop, shop?.plan ?? "free", {
     productId: parseId(url.searchParams.get("productId")),
     rating: rating >= 1 && rating <= 5 ? rating : undefined,
     search: url.searchParams.get("search")?.trim() || undefined,

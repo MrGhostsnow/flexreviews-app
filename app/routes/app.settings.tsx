@@ -19,6 +19,7 @@ import {
   saveJudgeMeToken,
   setSyncInterval,
 } from "../models/shop.server";
+import { FREE_PLAN_REVIEW_LIMIT } from "../utils/plans";
 import { formatRelativeTime } from "../utils/format";
 
 const SYNC_INTERVAL_OPTIONS = [
@@ -95,16 +96,18 @@ export const action = async ({
       return { intent, ok: true, message: "Sync interval saved" };
     }
 
-    case "upgrade":
+    case "upgrade": {
+      // Shopify App Pricing: send the merchant to Shopify's hosted plan page.
+      let pricingPlansUrl: string;
       try {
-        // Shopify App Pricing: send the merchant to Shopify's hosted plan page.
-        return redirect(await getPricingPlansUrl(admin.graphql, shop), {
-          target: "_top",
-        });
+        pricingPlansUrl = await getPricingPlansUrl(admin.graphql);
       } catch (error) {
         console.error(`[billing] upgrade failed for ${shop}:`, error);
         return { intent, ok: false, message: "Could not start the upgrade" };
       }
+      // Outside the try: for fetcher requests redirect() throws its response.
+      return redirect(pricingPlansUrl, { target: "_top" });
+    }
 
     default:
       return { intent, ok: false, message: "Unknown action" };
@@ -220,8 +223,8 @@ export default function Settings() {
         <s-section heading="Your plan">
           <s-badge tone="neutral">Free plan</s-badge>
           <s-paragraph>
-            Included in Free: Grid layout, basic customization, sync up to 100
-            reviews.
+            Included in Free: Grid layout, basic customization, and your{" "}
+            {FREE_PLAN_REVIEW_LIMIT} most recent reviews.
           </s-paragraph>
           <s-paragraph>
             Upgrade to Pro for $11.99/month to unlock Carousel and List layouts,

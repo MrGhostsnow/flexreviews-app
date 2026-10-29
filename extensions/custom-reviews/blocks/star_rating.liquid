@@ -162,12 +162,6 @@
     color: var(--cr-text-color);
     white-space: normal;
   }
-  .cr-list-row__author {
-    font-size: 13px;
-    color: var(--cr-text-color);
-    opacity: 0.6;
-    margin: 0;
-  }
 
   /* Card */
   .cr-card {
@@ -691,19 +685,65 @@
         starsCol.className = "cr-list-row__stars";
         starsCol.appendChild(buildStars(review.rating, cardSettings.starStyle));
 
+        if (cardSettings.showDate) {
+          var dateEl = document.createElement("div");
+          dateEl.className = "cr-date";
+          dateEl.textContent = buildDate(review.createdAt, cardSettings.dateFormat);
+          starsCol.appendChild(dateEl);
+        }
+
         var contentCol = document.createElement("div");
         contentCol.className = "cr-list-row__content";
 
-        var body = document.createElement("p");
-        body.className = "cr-list-row__body";
-        body.textContent = review.body || "";
+        if (cardSettings.showReviewTitle && review.title) {
+          var title = document.createElement("p");
+          title.className = "cr-title";
+          var strong = document.createElement("strong");
+          strong.textContent = review.title;
+          title.appendChild(strong);
+          contentCol.appendChild(title);
+        }
 
-        var author = document.createElement("p");
-        author.className = "cr-list-row__author";
-        author.textContent = review.reviewerName || "Anonymous";
-
+        var body = cardSettings.truncateBody
+          ? buildTruncatedBody(review.body || "")
+          : (function () {
+              var p = document.createElement("p");
+              p.className = "cr-list-row__body";
+              p.textContent = review.body || "";
+              return p;
+            })();
         contentCol.appendChild(body);
-        contentCol.appendChild(author);
+
+        var photos = buildPhotos(review.photos, cardSettings.showPhotos);
+        if (photos) {
+          contentCol.appendChild(photos);
+        }
+
+        var footer = document.createElement("div");
+        footer.className = "cr-card-footer";
+
+        var avatar = buildAvatar(review.reviewerName, cardSettings.showAvatar);
+        if (avatar) {
+          footer.appendChild(avatar);
+        }
+
+        if (cardSettings.showReviewerName) {
+          var author = document.createElement("span");
+          author.className = "cr-reviewer";
+          author.textContent = review.reviewerName || "Anonymous";
+          footer.appendChild(author);
+        }
+
+        if (cardSettings.showVerifiedBadge && review.verifiedBuyerStatus === "verified") {
+          var verified = document.createElement("span");
+          verified.className = "cr-verified";
+          verified.textContent = "✓ Verified";
+          footer.appendChild(verified);
+        }
+
+        if (footer.childNodes.length > 0) {
+          contentCol.appendChild(footer);
+        }
 
         row.appendChild(starsCol);
         row.appendChild(contentCol);

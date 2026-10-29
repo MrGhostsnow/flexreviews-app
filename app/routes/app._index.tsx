@@ -11,7 +11,12 @@ import { authenticate } from "../shopify.server";
 import { syncPlan } from "../lib/billing.server";
 import { isSyncing, syncShop } from "../lib/sync.server";
 import { ensureShop } from "../models/shop.server";
-import { getReviewStats, listReviews } from "../models/review.server";
+import {
+  countSyncedReviews,
+  getReviewStats,
+  listReviews,
+} from "../models/review.server";
+import { FREE_PLAN_REVIEW_LIMIT } from "../utils/plans";
 import { formatRelativeTime, formatStars } from "../utils/format";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -26,18 +31,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const connected = Boolean(shop.judgeMeToken);
-  const [stats, recent] = connected
+  const [stats, recent, syncedCount] = connected
     ? await Promise.all([
-        getReviewStats(session.shop),
-        listReviews(session.shop, { sort: "recent", limit: 5 }),
+        getReviewStats(session.shop, plan),
+        listReviews(session.shop, plan, { sort: "recent", limit: 5 }),
+        countSyncedReviews(session.shop),
       ])
-    : [null, null];
+    : [null, null, 0];
 
   return {
     connected,
     plan,
     stats,
     recentReviews: recent?.reviews ?? [],
+    syncedCount,
     lastSyncedAt: shop.lastSyncedAt?.toISOString() ?? null,
     syncing: isSyncing(session.shop),
   };
@@ -55,8 +62,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Dashboard() {
-  const { connected, plan, stats, recentReviews, lastSyncedAt, syncing } =
-    useLoaderData<typeof loader>();
+  const {
+    connected,
+    plan,
+    stats,
+    recentReviews,
+    syncedCount,
+    lastSyncedAt,
+    syncing,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const isSubmitting = fetcher.state !== "idle";
@@ -101,6 +115,14 @@ export default function Dashboard() {
       >
         {isSubmitting || syncing ? "Syncing..." : "Force sync now"}
       </s-button>
+
+      {plan !== "pro" && syncedCount > FREE_PLAN_REVIEW_LIMIT && (
+        <s-banner tone="warning" heading="Free plan review limit reached">
+          Your store has {syncedCount} reviews, and the Free plan shows the{" "}
+          {FREE_PLAN_REVIEW_LIMIT} most recent. Upgrade to Pro in Settings to
+          show all of them.
+        </s-banner>
+      )}
 
       <s-section>
         <s-grid gridTemplateColumns="1fr 1fr" gap="base">

@@ -7,10 +7,8 @@ import { isSyncing } from "../lib/sync.server";
 // Review stats for admin extensions (sidekick-tools).
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, cors } = await authenticate.admin(request);
-  const [stats, shop] = await Promise.all([
-    getReviewStats(session.shop),
-    getShop(session.shop),
-  ]);
+  const shop = await getShop(session.shop);
+  const stats = await getReviewStats(session.shop, shop?.plan ?? "free");
 
   return cors(
     Response.json({
