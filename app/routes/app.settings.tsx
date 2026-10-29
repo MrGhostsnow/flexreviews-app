@@ -96,16 +96,18 @@ export const action = async ({
       return { intent, ok: true, message: "Sync interval saved" };
     }
 
-    case "upgrade":
+    case "upgrade": {
+      // Shopify App Pricing: send the merchant to Shopify's hosted plan page.
+      let pricingPlansUrl: string;
       try {
-        // Shopify App Pricing: send the merchant to Shopify's hosted plan page.
-        return redirect(await getPricingPlansUrl(admin.graphql, shop), {
-          target: "_top",
-        });
+        pricingPlansUrl = await getPricingPlansUrl(admin.graphql);
       } catch (error) {
         console.error(`[billing] upgrade failed for ${shop}:`, error);
         return { intent, ok: false, message: "Could not start the upgrade" };
       }
+      // Outside the try: for fetcher requests redirect() throws its response.
+      return redirect(pricingPlansUrl, { target: "_top" });
+    }
 
     default:
       return { intent, ok: false, message: "Unknown action" };

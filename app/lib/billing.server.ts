@@ -31,7 +31,9 @@ export async function syncPlan(graphql: AdminGraphqlClient, shop: string) {
   return plan;
 }
 
-export async function getPricingPlansUrl(graphql: AdminGraphqlClient, shop: string) {
+// Admin path of Shopify's hosted plan selection page. The library's redirect
+// turns shopify://admin/ paths into the store's admin URL.
+export async function getPricingPlansUrl(graphql: AdminGraphqlClient) {
   const response = await graphql(
     `#graphql
       query FlexReviewsAppHandle {
@@ -48,6 +50,5 @@ export async function getPricingPlansUrl(graphql: AdminGraphqlClient, shop: stri
     throw new Error("Could not read the app handle");
   }
 
-  const storeHandle = shop.replace(/\.myshopify\.com$/, "");
-  return `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+  return `shopify://admin/charges/${appHandle}/pricing_plans`;
 }
