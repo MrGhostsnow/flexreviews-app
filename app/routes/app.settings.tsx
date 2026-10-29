@@ -19,6 +19,7 @@ import {
   saveJudgeMeToken,
   setSyncInterval,
 } from "../models/shop.server";
+import { FREE_PLAN_REVIEW_LIMIT } from "../utils/plans";
 import { formatRelativeTime } from "../utils/format";
 
 const SYNC_INTERVAL_OPTIONS = [
@@ -220,8 +221,8 @@ export default function Settings() {
         <s-section heading="Your plan">
           <s-badge tone="neutral">Free plan</s-badge>
           <s-paragraph>
-            Included in Free: Grid layout, basic customization, sync up to 100
-            reviews.
+            Included in Free: Grid layout, basic customization, and your{" "}
+            {FREE_PLAN_REVIEW_LIMIT} most recent reviews.
           </s-paragraph>
           <s-paragraph>
             Upgrade to Pro for $11.99/month to unlock Carousel and List layouts,

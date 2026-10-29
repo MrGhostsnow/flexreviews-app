@@ -2,6 +2,7 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigation, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+import { getShop } from "../models/shop.server";
 import { listReviews, parseSort } from "../models/review.server";
 import { formatRelativeTime, formatStars } from "../utils/format";
 
@@ -22,7 +23,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const rating = ratingParam >= 1 && ratingParam <= 5 ? ratingParam : null;
   const sort = parseSort(url.searchParams.get("sort"));
 
-  const { reviews, total } = await listReviews(session.shop, {
+  const shop = await getShop(session.shop);
+  const { reviews, total } = await listReviews(session.shop, shop?.plan ?? "free", {
     rating: rating ?? undefined,
     sort,
     limit: PAGE_SIZE,

@@ -1,5 +1,6 @@
 import type { Prisma, Review } from "@prisma/client";
 import db from "../db.server";
+import { FREE_PLAN_REVIEW_LIMIT } from "../utils/plans";
 
 export const SORT_KEYS = ["recent", "highest", "lowest"] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
@@ -23,6 +24,24 @@ const ORDER_BY: Record<SortKey, Prisma.ReviewOrderByWithRelationInput[]> = {
   lowest: [{ rating: "asc" }, ...NEWEST_FIRST],
 };
 
+// Free shops see only their most recent reviews, Pro shops see all of them.
+// Every review is still synced, so upgrading shows the rest right away.
+async function visibleScope(
+  shop: string,
+  plan: string,
+): Promise<Prisma.ReviewWhereInput> {
+  if (plan === "pro") return { shop };
+
+  const newest = await db.review.findMany({
+    where: { shop },
+    orderBy: NEWEST_FIRST,
+    take: FREE_PLAN_REVIEW_LIMIT,
+    select: { sourceReviewId: true },
+  });
+  // Judge.me is the only source today, so the review id is unique per shop.
+  return { shop, sourceReviewId: { in: newest.map((r) => r.sourceReviewId) } };
+}
+
 // Parses a positive integer id; Shopify product ids don't fit in 32 bits.
 export function parseId(value: string | null | undefined) {
   if (!value || !/^\d+$/.test(value)) return undefined;
@@ -39,8 +58,11 @@ export interface ReviewFilters {
   offset?: number;
 }
 
-function buildWhere(shop: string, filters: ReviewFilters): Prisma.ReviewWhereInput {
-  const where: Prisma.ReviewWhereInput = { shop };
+function buildWhere(
+  scope: Prisma.ReviewWhereInput,
+  filters: ReviewFilters,
+): Prisma.ReviewWhereInput {
+  const where: Prisma.ReviewWhereInput = { ...scope };
   if (filters.productId) where.productExternalId = filters.productId;
   if (filters.rating) where.rating = filters.rating;
   if (filters.search) {
@@ -52,8 +74,12 @@ function buildWhere(shop: string, filters: ReviewFilters): Prisma.ReviewWhereInp
   return where;
 }
 
-export async function listReviews(shop: string, filters: ReviewFilters) {
-  const where = buildWhere(shop, filters);
+export async function listReviews(
+  shop: string,
+  plan: string,
+  filters: ReviewFilters,
+) {
+  const where = buildWhere(await visibleScope(shop, plan), filters);
   const [reviews, total] = await Promise.all([
     db.review.findMany({
       where,
@@ -66,10 +92,10 @@ export async function listReviews(shop: string, filters: ReviewFilters) {
   return { reviews: reviews.map(serializeReview), total };
 }
 
-export async function getReviewStats(shop: string) {
+export async function getReviewStats(shop: string, plan: string) {
   const groups = await db.review.groupBy({
     by: ["rating"],
-    where: { shop },
+    where: await visibleScope(shop, plan),
     _count: { _all: true },
   });
 
@@ -96,6 +122,11 @@ export async function getReviewStats(shop: string) {
     averageRating: total > 0 ? Math.round((sum / total) * 10) / 10 : 0,
     distribution,
   };
+}
+
+// Every synced review, regardless of plan.
+export function countSyncedReviews(shop: string) {
+  return db.review.count({ where: { shop } });
 }
 
 // JSON-safe shape, same fields as the old reviews-api.
