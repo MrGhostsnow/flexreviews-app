@@ -32,6 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return {
+    connected: Boolean(shop?.judgeMeToken),
     reviews,
     page,
     rating,
@@ -41,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Reviews() {
-  const { reviews, page, rating, sort, totalPages } =
+  const { connected, reviews, page, rating, sort, totalPages } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigation = useNavigation();
@@ -93,9 +94,20 @@ export default function Reviews() {
 
       {reviews.length === 0 ? (
         <s-section>
-          <s-banner tone="info" heading="No reviews found">
-            Try adjusting your filters.
-          </s-banner>
+          {!connected ? (
+            <s-banner tone="info" heading="Connect Judge.me to see your reviews">
+              Your reviews appear here once your Judge.me account is connected.{" "}
+              <s-link href="/app/settings">Go to Settings</s-link>
+            </s-banner>
+          ) : rating ? (
+            <s-banner tone="info" heading="No reviews found">
+              Try adjusting your filters.
+            </s-banner>
+          ) : (
+            <s-banner tone="info" heading="No reviews synced yet">
+              Reviews appear here after the next sync with Judge.me.
+            </s-banner>
+          )}
         </s-section>
       ) : (
         <s-section heading="Reviews">

@@ -17,15 +17,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const record = shop ? await getShop(shop) : null;
+  // Not connected to Judge.me yet (or disconnected): answer with no reviews.
+  // A 5xx here would make the app proxy replace the response with Shopify's
+  // "error in the third-party application" page, breaking the block.
+  const connected = Boolean(record?.judgeMeToken);
 
-  if (!shop || !record?.judgeMeToken) {
-    return Response.json(
-      { error: "Shop not configured. Please complete onboarding." },
-      { status: 503 },
-    );
-  }
-
-  const plan = record.plan === "pro" ? "pro" : "free";
+  const plan = record?.plan === "pro" ? "pro" : "free";
   const requestedTemplate = url.searchParams.get("template") ?? "";
   const template = TEMPLATES.has(requestedTemplate) ? requestedTemplate : "grid";
   const upgradeRequired = plan === "free" && !FREE_TEMPLATES.has(template);
@@ -37,11 +34,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? Math.min(requestedCount, MAX_COUNT)
       : DEFAULT_COUNT;
 
-  const { reviews } = await listReviews(shop, plan, {
-    productId: parseId(url.searchParams.get("productId")),
-    sort,
-    limit: count,
-  });
+  const { reviews } =
+    connected && shop
+      ? await listReviews(shop, plan, {
+          productId: parseId(url.searchParams.get("productId")),
+          sort,
+          limit: count,
+        })
+      : { reviews: [] };
 
   return Response.json({
     reviews,
