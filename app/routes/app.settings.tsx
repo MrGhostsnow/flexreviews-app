@@ -20,6 +20,10 @@ import {
   setSyncInterval,
 } from "../models/shop.server";
 import { FREE_PLAN_REVIEW_LIMIT } from "../utils/plans";
+import {
+  loadSampleReviews,
+  removeSampleReviews,
+} from "../models/sample-reviews.server";
 import { formatRelativeTime } from "../utils/format";
 
 const SYNC_INTERVAL_OPTIONS = [
@@ -42,6 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     shopDomain: session.shop,
     connected: Boolean(shop.judgeMeToken),
+    demoMode: !shop.judgeMeToken && shop.demoMode,
     plan,
     reviewCount: await db.review.count({ where: { shop: session.shop } }),
     lastSyncedAt: shop.lastSyncedAt?.toISOString() ?? null,
@@ -73,6 +78,15 @@ export const action = async ({
       );
       return { intent, ok: true, message: "Judge.me connected" };
     }
+
+    case "load-samples": {
+      const count = await loadSampleReviews(shop);
+      return { intent, ok: true, message: `${count} sample reviews added` };
+    }
+
+    case "remove-samples":
+      await removeSampleReviews(shop);
+      return { intent, ok: true, message: "Sample reviews removed" };
 
     case "disconnect":
       await disconnectJudgeMe(shop);
@@ -118,6 +132,7 @@ export default function Settings() {
   const {
     shopDomain,
     connected,
+    demoMode,
     plan,
     reviewCount,
     lastSyncedAt,
@@ -188,6 +203,40 @@ export default function Settings() {
           error={connectError}
           onConnect={(apiToken) => submit("connect", { apiToken })}
         />
+      )}
+
+      {!connected && (
+        <s-section heading="Sample reviews">
+          {demoMode ? (
+            <>
+              <s-paragraph>
+                Sample reviews are loaded. They show in the admin and in the
+                theme editor preview only; shoppers never see them. Connecting
+                Judge.me replaces them with your real reviews.
+              </s-paragraph>
+              <s-button
+                onClick={() => submit("remove-samples")}
+                loading={pendingIntent === "remove-samples"}
+              >
+                Remove sample reviews
+              </s-button>
+            </>
+          ) : (
+            <>
+              <s-paragraph>
+                No Judge.me account yet? Load sample reviews to try the
+                Dashboard, the Reviews page and the storefront block in the
+                theme editor. Shoppers never see them.
+              </s-paragraph>
+              <s-button
+                onClick={() => submit("load-samples")}
+                loading={pendingIntent === "load-samples"}
+              >
+                Try with sample reviews
+              </s-button>
+            </>
+          )}
+        </s-section>
       )}
 
       {connected && (

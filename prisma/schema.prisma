@@ -42,6 +42,8 @@ model Shop {
   syncInterval Int       @default(60)
   lastSyncedAt DateTime?
   nextSyncAt   DateTime?
+  // Sample reviews loaded for trying the app without Judge.me.
+  demoMode     Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   reviews      Review[]

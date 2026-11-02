@@ -838,6 +838,10 @@
       sort: settings.sort,
       productId: settings.productId
     });
+    // In the theme editor the app may answer with sample reviews.
+    if (window.Shopify && window.Shopify.designMode) {
+      query.set("preview", "1");
+    }
 
     fetch(settings.proxyUrl + "/api/reviews?" + query.toString())
       .then(function (res) {
