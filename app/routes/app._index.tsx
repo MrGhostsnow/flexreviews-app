@@ -10,6 +10,10 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { syncPlan } from "../lib/billing.server";
 import { isSyncing, syncShop } from "../lib/sync.server";
+import {
+  loadSampleReviews,
+  removeSampleReviews,
+} from "../models/sample-reviews.server";
 import { ensureShop } from "../models/shop.server";
 import {
   countSyncedReviews,
@@ -31,7 +35,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const connected = Boolean(shop.judgeMeToken);
-  const [stats, recent, syncedCount] = connected
+  const demoMode = !connected && shop.demoMode;
+  const [stats, recent, syncedCount] = connected || demoMode
     ? await Promise.all([
         getReviewStats(session.shop, plan),
         listReviews(session.shop, plan, { sort: "recent", limit: 5 }),
@@ -41,6 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return {
     connected,
+    demoMode,
     plan,
     stats,
     recentReviews: recent?.reviews ?? [],
@@ -52,18 +58,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
+  const intent = String((await request.formData()).get("intent") ?? "sync");
+
+  if (intent === "load-samples") {
+    const count = await loadSampleReviews(session.shop);
+    return { message: `${count} sample reviews added`, error: null };
+  }
+  if (intent === "remove-samples") {
+    await removeSampleReviews(session.shop);
+    return { message: "Sample reviews removed", error: null };
+  }
+
   try {
     const synced = await syncShop(session.shop);
-    return { synced, error: null };
+    return { message: `${synced} reviews synced`, error: null };
   } catch (error) {
     console.error(`[sync] ${session.shop} failed:`, error);
-    return { synced: null, error: "Sync failed. Please try again." };
+    return { message: null, error: "Sync failed. Please try again." };
   }
 };
 
 export default function Dashboard() {
   const {
     connected,
+    demoMode,
     plan,
     stats,
     recentReviews,
@@ -73,17 +91,20 @@ export default function Dashboard() {
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
-  const isSubmitting = fetcher.state !== "idle";
+  const pendingIntent =
+    fetcher.state !== "idle" ? String(fetcher.formData?.get("intent")) : null;
+  const submit = (intent: string) =>
+    fetcher.submit({ intent }, { method: "POST" });
 
   useEffect(() => {
-    if (fetcher.data?.synced != null) {
-      shopify.toast.show(`${fetcher.data.synced} reviews synced`);
+    if (fetcher.data?.message) {
+      shopify.toast.show(fetcher.data.message);
     } else if (fetcher.data?.error) {
       shopify.toast.show(fetcher.data.error, { isError: true });
     }
   }, [fetcher.data, shopify]);
 
-  if (!connected) {
+  if (!connected && !demoMode) {
     return (
       <s-page heading="Dashboard">
         <s-section>
@@ -92,11 +113,19 @@ export default function Dashboard() {
             heading="Connect your Judge.me account to get started"
           >
             Sync your existing reviews and display them with full layout
-            freedom.
+            freedom. No Judge.me account yet? Try the app with sample reviews.
           </s-banner>
-          <s-button variant="primary" href="/app/settings">
-            Connect Judge.me
-          </s-button>
+          <s-stack direction="inline" gap="small">
+            <s-button variant="primary" href="/app/settings">
+              Connect Judge.me
+            </s-button>
+            <s-button
+              onClick={() => submit("load-samples")}
+              loading={pendingIntent === "load-samples"}
+            >
+              Try with sample reviews
+            </s-button>
+          </s-stack>
         </s-section>
       </s-page>
     );
@@ -108,13 +137,32 @@ export default function Dashboard() {
 
   return (
     <s-page heading="Dashboard">
-      <s-button
-        slot="primary-action"
-        onClick={() => fetcher.submit({}, { method: "POST" })}
-        loading={isSubmitting || syncing}
-      >
-        {isSubmitting || syncing ? "Syncing..." : "Force sync now"}
-      </s-button>
+      {demoMode ? (
+        <s-banner tone="info" heading="You're viewing sample reviews">
+          Sample reviews show in the admin and in the theme editor preview
+          only; shoppers never see them. Connect Judge.me to show your real
+          reviews.
+          <s-stack direction="inline" gap="small">
+            <s-button variant="primary" href="/app/settings">
+              Connect Judge.me
+            </s-button>
+            <s-button
+              onClick={() => submit("remove-samples")}
+              loading={pendingIntent === "remove-samples"}
+            >
+              Remove sample reviews
+            </s-button>
+          </s-stack>
+        </s-banner>
+      ) : (
+        <s-button
+          slot="primary-action"
+          onClick={() => submit("sync")}
+          loading={pendingIntent === "sync" || syncing}
+        >
+          {pendingIntent === "sync" || syncing ? "Syncing..." : "Force sync now"}
+        </s-button>
+      )}
 
       {plan !== "pro" && syncedCount > FREE_PLAN_REVIEW_LIMIT && (
         <s-banner tone="warning" heading="Free plan review limit reached">
@@ -129,7 +177,11 @@ export default function Dashboard() {
           <s-stack direction="block" gap="small-200">
             <s-heading>Total reviews</s-heading>
             <s-heading>{total}</s-heading>
-            <s-paragraph>Last sync: {formatRelativeTime(lastSyncedAt)}</s-paragraph>
+            <s-paragraph>
+              {demoMode
+                ? "Sample data"
+                : `Last sync: ${formatRelativeTime(lastSyncedAt)}`}
+            </s-paragraph>
           </s-stack>
           <s-stack direction="block" gap="small-200">
             <s-heading>Average rating</s-heading>
@@ -190,7 +242,11 @@ export default function Dashboard() {
 
       <s-section>
         <s-stack direction="inline" gap="small" alignItems="center">
-          <s-badge tone="success">Connected</s-badge>
+          {demoMode ? (
+            <s-badge tone="info">Sample reviews</s-badge>
+          ) : (
+            <s-badge tone="success">Connected</s-badge>
+          )}
           <s-badge tone={plan === "pro" ? "success" : "neutral"}>
             {plan === "pro" ? "Pro plan" : "Free plan"}
           </s-badge>

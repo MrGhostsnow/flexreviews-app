@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return {
-    connected: Boolean(shop?.judgeMeToken),
+    connected: Boolean(shop?.judgeMeToken || shop?.demoMode),
     reviews,
     page,
     rating,

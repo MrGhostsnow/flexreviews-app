@@ -1,5 +1,6 @@
 import db from "../db.server";
 import { encrypt } from "../lib/crypto.server";
+import { SAMPLE_PROVIDER } from "./sample-reviews.server";
 
 export type Plan = "free" | "pro";
 
@@ -36,11 +37,19 @@ export function getShop(shop: string) {
   return db.shop.findUnique({ where: { shop } });
 }
 
+// Connecting Judge.me replaces any sample reviews with the real ones.
 export function saveJudgeMeToken(shop: string, apiToken: string) {
-  return db.shop.update({
-    where: { shop },
-    data: { judgeMeToken: encrypt(apiToken), nextSyncAt: new Date() },
-  });
+  return db.$transaction([
+    db.review.deleteMany({ where: { shop, sourceProvider: SAMPLE_PROVIDER } }),
+    db.shop.update({
+      where: { shop },
+      data: {
+        judgeMeToken: encrypt(apiToken),
+        demoMode: false,
+        nextSyncAt: new Date(),
+      },
+    }),
+  ]);
 }
 
 // Reviews already synced are kept, matching the old API.

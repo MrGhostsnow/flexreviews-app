@@ -838,6 +838,10 @@
       sort: settings.sort,
       productId: settings.productId
     });
+    // In the theme editor the app may answer with sample reviews.
+    if (window.Shopify && window.Shopify.designMode) {
+      query.set("preview", "1");
+    }
 
     fetch(settings.proxyUrl + "/api/reviews?" + query.toString())
       .then(function (res) {
@@ -956,13 +960,13 @@
       "type": "checkbox",
       "id": "show_average_rating",
       "label": "Show average rating summary (Pro)",
-      "default": true
+      "default": false
     },
     {
       "type": "checkbox",
       "id": "show_review_count",
       "label": "Show total review count (Pro)",
-      "default": true
+      "default": false
     },
     {
       "type": "header",
@@ -994,7 +998,7 @@
       "type": "checkbox",
       "id": "show_verified_badge",
       "label": "Show verified purchase badge (Pro)",
-      "default": true
+      "default": false
     },
     {
       "type": "checkbox",

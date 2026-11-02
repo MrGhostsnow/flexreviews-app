@@ -21,6 +21,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // A 5xx here would make the app proxy replace the response with Shopify's
   // "error in the third-party application" page, breaking the block.
   const connected = Boolean(record?.judgeMeToken);
+  // Sample reviews are only for trying the app: the block asks for them from
+  // the theme editor preview, and shoppers never see them.
+  const showSamples =
+    !connected && Boolean(record?.demoMode) && url.searchParams.get("preview") === "1";
 
   const plan = record?.plan === "pro" ? "pro" : "free";
   const requestedTemplate = url.searchParams.get("template") ?? "";
@@ -35,9 +39,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       : DEFAULT_COUNT;
 
   const { reviews } =
-    connected && shop
+    (connected || showSamples) && shop
       ? await listReviews(shop, plan, {
-          productId: parseId(url.searchParams.get("productId")),
+          // Sample reviews belong to no product, so they show on every one.
+          productId: showSamples
+            ? undefined
+            : parseId(url.searchParams.get("productId")),
           sort,
           limit: count,
         })
