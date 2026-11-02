@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 
 // AES-256-GCM. Stored values look like "v1:<iv>:<auth tag>:<ciphertext>",
 // each part base64-encoded.
@@ -47,4 +52,9 @@ export function decrypt(payload: string): string {
     decipher.update(Buffer.from(ciphertext, "base64")),
     decipher.final(),
   ]).toString("utf8");
+}
+
+// One-way hash used to match a customer's email without storing it.
+export function hashEmail(email: string) {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 }
