@@ -2,6 +2,7 @@ import db from "../db.server";
 import { decrypt } from "./crypto.server";
 import { fetchAllJudgeMeReviews, normalizeReview } from "./judgeme.server";
 import { minutesFrom } from "../models/shop.server";
+import { loadRedactedMatcher } from "../models/customer.server";
 
 // How often the scheduler looks for shops whose next sync is due.
 const SCHEDULER_TICK_MS = 5 * 60 * 1000;
@@ -19,10 +20,15 @@ async function runSync(shop: string) {
   }
 
   const apiToken = decrypt(record.judgeMeToken);
+  const isRedacted = await loadRedactedMatcher(shop);
+  const startedAt = new Date();
+
   const synced = await fetchAllJudgeMeReviews(shop, apiToken, async (page) => {
+    const reviews = page
+      .map((raw) => normalizeReview(raw, shop))
+      .filter((review) => !isRedacted(review));
     await db.$transaction(
-      page.map((raw) => {
-        const review = normalizeReview(raw, shop);
+      reviews.map((review) => {
         return db.review.upsert({
           where: {
             shop_sourceProvider_sourceReviewId: {
@@ -38,6 +44,17 @@ async function runSync(shop: string) {
     );
   });
 
+  // Every review still in Judge.me was just touched, so anything older was
+  // deleted or unpublished there (including Judge.me's own GDPR deletions).
+  // Only runs after a complete sync: a failed page throws before this. An
+  // empty answer is not trusted, so a Judge.me hiccup can't wipe the cache.
+  const removed =
+    synced > 0
+      ? await db.review.deleteMany({
+          where: { shop, syncedAt: { lt: startedAt } },
+        })
+      : { count: 0 };
+
   const now = new Date();
   await db.shop.update({
     where: { shop },
@@ -47,7 +64,9 @@ async function runSync(shop: string) {
     },
   });
 
-  console.log(`[sync] ${shop}: ${synced} reviews upserted`);
+  console.log(
+    `[sync] ${shop}: ${synced} reviews fetched, ${removed.count} removed`,
+  );
   return synced;
 }
 

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { hashEmail } from "./crypto.server";
 
 const JUDGEME_API_BASE = "https://api.judge.me/api/v1";
 const PAGE_SIZE = 100;
@@ -11,7 +12,12 @@ export interface JudgeMeReview {
   rating: number;
   title?: string | null;
   body?: string | null;
-  reviewer?: { name?: string | null } | null;
+  reviewer?: {
+    name?: string | null;
+    email?: string | null;
+    // Shopify customer id, when Judge.me knows it.
+    external_id?: number | string | null;
+  } | null;
   pictures?: { url?: string; urls?: { original?: string } }[] | null;
   has_published_pictures?: boolean | null;
   has_published_videos?: boolean | null;
@@ -71,6 +77,12 @@ export async function fetchAllJudgeMeReviews(
   return total;
 }
 
+function parseCustomerId(value: number | string | null | undefined) {
+  if (value == null) return null;
+  const text = String(value);
+  return /^\d+$/.test(text) ? BigInt(text) : null;
+}
+
 function parseDate(value: string | null | undefined) {
   if (!value) return null;
   const date = new Date(value);
@@ -92,6 +104,8 @@ export function normalizeReview(
     title: raw.title ?? null,
     body: raw.body ?? null,
     reviewerName: raw.reviewer?.name ?? null,
+    reviewerCustomerId: parseCustomerId(raw.reviewer?.external_id),
+    reviewerEmailHash: raw.reviewer?.email ? hashEmail(raw.reviewer.email) : null,
     photos: (raw.pictures ?? [])
       .map((picture) => picture.url ?? picture.urls?.original)
       .filter((url): url is string => Boolean(url)),

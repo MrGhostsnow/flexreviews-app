@@ -45,6 +45,7 @@ model Shop {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   reviews      Review[]
+  redactedCustomers RedactedCustomer[]
 }
 
 model Review {
@@ -58,6 +59,10 @@ model Review {
   title                String?
   body                 String?
   reviewerName         String?
+  // Used only to find a customer's reviews for compliance requests; the
+  // reviewer's email itself is never stored.
+  reviewerCustomerId   BigInt?
+  reviewerEmailHash    String?
   photos               String[]  @default([])
   hasPublishedPictures Boolean   @default(false)
   hasPublishedVideos   Boolean   @default(false)
@@ -69,4 +74,20 @@ model Review {
   @@id([shop, sourceProvider, sourceReviewId])
   @@index([shop, productExternalId])
   @@index([shop, createdAt])
+  @@index([shop, reviewerCustomerId])
+  @@index([shop, reviewerEmailHash])
+}
+
+// Customers redacted through customers/redact. Sync skips their reviews so a
+// sync that runs before Judge.me handles the same request can't bring them
+// back.
+model RedactedCustomer {
+  id         Int      @id @default(autoincrement())
+  shop       String
+  customerId BigInt?
+  emailHash  String?
+  createdAt  DateTime @default(now())
+  shopRecord Shop     @relation(fields: [shop], references: [shop], onDelete: Cascade)
+
+  @@index([shop])
 }
